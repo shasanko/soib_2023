@@ -3,10 +3,17 @@ cur_metadata <- analyses_metadata %>% filter(MASK == cur_mask)
 
 # read paths
 base_path <- cur_metadata$FULLSPECLIST.PATH
+speclist_path <- cur_metadata$SPECLISTDATA.PATH
+
 trends_pathonly <- cur_metadata$TRENDS.PATHONLY
+occu_pres_pathonly <- cur_metadata$OCCU.PRES.PATHONLY
+occu_mod_pathonly <- cur_metadata$OCCU.MOD.PATHONLY
+
 # write paths
 cursens_path <- cur_metadata$CURSENS.PATH 
 trends_outpath <- cur_metadata$TRENDS.OUTPATH
+occu_outpath <- cur_metadata$OCCU.OUTPATH
+
 mainwocats_path <- cur_metadata$SOIBMAIN.WOCATS.PATH
 main_path <- cur_metadata$SOIBMAIN.PATH
 summary_path <- cur_metadata$SUMMARY.PATH
@@ -17,6 +24,7 @@ specsum_path <- cur_metadata$SPECSUM.PATH
 
 library(tidyverse)
 library(VGAM)
+library(sf)
 
 source('00_scripts/00_functions.R')
 
@@ -747,12 +755,130 @@ tojoin <- map(2023:2029, ~ trends %>%
 
 main <- main %>% left_join(tojoin)
 
+
+# calculations: occupancy -------------------------------------------------
+
+load("00_data/maps_sf.RData")
+load(speclist_path)
+
+
+# occupancy-model files
+occu_model <- list.files(path = occu_mod_pathonly, full.names = T) %>% 
+  map_df(read.csv) %>%
+  dplyr::select(-area) %>% # remove this later ###
+  rename(gridg1 = gridg)
+
+# occupancy-presence files
+occu_presence <- list.files(path = occu_pres_pathonly, full.names = T) %>% 
+  map_df(read.csv) %>% 
+  rename(presence = actual) # remove this later (will be named "presence" already) ###
+
+# taking modelled occupancy values for species in cell where "absent"
+occ.full1 = occu_model %>% 
+  left_join(occu_presence) %>% 
+  filter(is.na(presence)) 
+
+# "presences"
+occ.full2 = occu_presence %>% 
+  left_join(occu_model) %>% 
+  dplyr::select(names(occ.full1))
+
+
+occu_full = rbind(occ.full1, occ.full2) %>% 
+  mutate(gridg1 = as.character(gridg1)) %>% 
+  # joining areas of each grid cell
+  left_join(g1_in_sf %>% 
+              st_drop_geometry() %>% 
+              transmute(gridg1 = GRID.G1, area = AREA.G1))
+
+#   # when present but model values also exist, assume full occupancy
+#   mutate(occupancy = if_else(presence == 1, 1, occupancy),
+#          se = if_else(presence == 1, 0, se)) %>% 
+#   filter(!is.na(occupancy), !is.na(se), !is.na(gridg1)) %>% 
+#   mutate(occupancy = if_else(nb == 0 & occupancy != 1, 0, occupancy),
+#          se = if_else(nb == 0 & occupancy != 1, 0, se))
+
+occu_full$occupancy[occu_full$presence == 1] = 1
+occu_full$se[occu_full$presence == 1] = 0
+occu_full = occu_full %>% filter(!is.na(occupancy), !is.na(se), !is.na(gridg1))
+occu_full$occupancy[occu_full$nb == 0 & occu_full$occupancy != 1] = 0
+occu_full$se[occu_full$nb == 0 & occu_full$occupancy != 1] = 0
+
+
+occu_summary = occu_full %>%
+  group_by(COMMON.NAME, status) %>% 
+  reframe(occ = sum(occupancy*area),
+          occ.ci = round((erroradd(se*area))*1.96))
+
+est = array(data = NA, 
+            dim = c(length(main$eBird.English.Name.2022), 2),
+            dimnames = list(main$eBird.English.Name.2022, c("occ", "occ.ci")))
+
+
+
+for (i in main$eBird.English.Name.2022)
+{
+  write_path <- glue("{occu_outpath}{i}.csv")
+  cur_occu_full = occu_full %>% filter(COMMON.NAME == i)
+  cur_occu_summary = occu_summary %>% filter(COMMON.NAME == i)
+  
+  # move to next species if this one empty
+  if (length(cur_occu_full$COMMON.NAME) == 0)
+    next
+  
+  # file to be used for creating maps later
+  write.csv(cur_occu_full, file = write_path, row.names = F)
+  
+  l = length(cur_occu_summary$status)
+  
+  for (j in 1:l)
+  {
+    flag = 0
+    
+    if (cur_occu_summary$status[j] %in% c("MP") & is.na(est[i,"occ"]))
+    {
+      est[i,"occ"] = cur_occu_summary$occ[j]
+      est[i,"occ.ci"] = cur_occu_summary$occ.ci[j]
+      flag = 1
+    }
+    
+    if (cur_occu_summary$status[j] %in% c("R","MS"))
+    {
+      est[i,"occ"] = cur_occu_summary$occ[j]
+      est[i,"occ.ci"] = cur_occu_summary$occ.ci[j]
+    }
+    
+    if (cur_occu_summary$status[j] %in% c("M","MW") & (is.na(est[i,"occ"]) | flag == 1))
+    {
+      est[i,"occ"] = cur_occu_summary$occ[j]
+      est[i,"occ.ci"] = cur_occu_summary$occ.ci[j]
+    }
+    
+  }
+}
+
+
+tojoin = data.frame(rep(rownames(est))) %>% 
+  magrittr::set_colnames("eBird.English.Name.2022") 
+
+tojoin$rangelci = round(as.numeric(est[,1])/10000,3) - round(as.numeric(est[,2])/10000,3)
+tojoin$rangemean = round(as.numeric(est[,1])/10000,3)
+tojoin$rangerci = round(as.numeric(est[,1])/10000,3) + round(as.numeric(est[,2])/10000,3)
+
+tojoin$rangemean[(tojoin$eBird.English.Name.2022 %in% specieslist$COMMON.NAME) & is.na(tojoin$rangemean)] = 0
+tojoin$rangelci[tojoin$rangemean == 0] = 0
+tojoin$rangerci[tojoin$rangemean == 0] = 0
+
+
+# joining to main object
+main <- main %>% left_join(tojoin)
+
 write.csv(main, file = mainwocats_path, row.names = F)
 
 
 # classification: assign SoIB Status categories (w/ sensitivity analysis) ----
 
-# classifying into SoIB Status for long-term and current
+# classifying into SoIB Status for long-term and current trends and range
 
 # taking upper limit of CI for declines, and lower limit for increases
 
@@ -798,7 +924,10 @@ main = read.csv(mainwocats_path) %>%
     
     SOIBv2.Range.Status = case_when(
       rangemean == 0 ~ "Historical",
-      rangerci < 0.75 ~ "Very Restricted",
+      rangerci < 0.0625 ~ "Very Restricted",
+      # larger threshold for species that are not island endemics
+      (!Endemic.Region %in% c("Andaman and Nicobar Islands", "Andaman Islands", "Nicobar Islands") &
+         rangerci < 0.75) ~ "Very Restricted",
       rangerci < 4.25 ~ "Restricted",
       rangelci > 100 ~ "Very Large",
       rangelci > 25 ~ "Large",
@@ -927,7 +1056,7 @@ cats_range = c("Historical", "Very Restricted", "Restricted",
 
 cats_decline = c("Decline", "Rapid Decline")
 cats_uncertain = c("eBird Data Deficient", "eBird Data Inconclusive")
-cats_restricted = c("Historical","Very Restricted", "Restricted")
+cats_restricted = c("Historical", "Very Restricted", "Restricted")
 
 
 priorityrules = read.csv("00_data/priorityclassificationrules.csv")
@@ -951,7 +1080,7 @@ main = main %>%
     
     SOIBv2.Long.Term.Status %in% cats_uncertain & 
       SOIBv2.Current.Status %in% cats_uncertain &
-      SOIB.Range.Status %in% cats_restricted &
+      SOIBv2.Range.Status %in% cats_restricted &
       IUCN.Category %in% c("Vulnerable") ~ "High",
     
     SOIBv2.Long.Term.Status %in% cats_uncertain & 
@@ -975,13 +1104,17 @@ main = main %>%
            BLI.Common.Name, BLI.Scientific.Name, IUCN.Category, WPA.Schedule,
            CITES.Appendix, CMS.Appendix, Onepercent.Estimates, 
            Long.Term.Analysis, Current.Analysis, Selected.SOIB, 
-           totalrange25km, proprange25km2000, proprange25km.current, proprange25km2022, mean5km, ci5km, 
-           longtermlci, longtermmean, longtermrci, currentslopelci, currentslopemean, currentsloperci, 
+           totalrange25km, proprange25km2000, proprange25km.current, proprange25km2022, 
+           mean5km, ci5km, 
            proj2023.lci, proj2023.mean, proj2023.rci, proj2024.lci, proj2024.mean, proj2024.rci, 
            proj2025.lci, proj2025.mean, proj2025.rci, proj2026.lci, proj2026.mean, proj2026.rci, 
            proj2027.lci, proj2027.mean, proj2027.rci, proj2028.lci, proj2028.mean, proj2028.rci, 
            proj2029.lci, proj2029.mean, proj2029.rci, 
-           SOIBv2.Long.Term.Status, SOIBv2.Current.Status, SOIBv2.Range.Status, SOIBv2.Priority.Status)
+           longtermlci, longtermmean, longtermrci, 
+           currentslopelci, currentslopemean, currentsloperci, 
+           rangelci, rangemean, rangerci,
+           SOIBv2.Long.Term.Status, SOIBv2.Current.Status, SOIBv2.Range.Status, 
+           SOIBv2.Priority.Status)
 
 write.csv(main, file = main_path, row.names = F)
 
