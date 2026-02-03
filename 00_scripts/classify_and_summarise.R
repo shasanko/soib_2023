@@ -3,6 +3,8 @@ library(glue)
 library(tictoc)
 library(writexl)
 
+source('00_scripts/00_functions.R')
+interannual_update <- TRUE
 
 # setup -------------------------------------------------------------------
 
@@ -22,8 +24,6 @@ main_path <- cur_metadata$SOIBMAIN.PATH
 summaries_path <- cur_metadata$SUMMARY.PATH
 
 ###
-
-source('00_scripts/00_functions.R')
 
 # for classification
 priorityrules = read.csv("00_data/priorityclassificationrules.csv") 
@@ -471,7 +471,8 @@ nat_priority <- get_metadata("none")$SOIBMAIN.PATH %>%
   read.csv() %>% 
   # contains() because if running national for first time, column will have previous year, 
   # else current year
-  dplyr::select(contains("eBird.English.Name.20"), SoIB.Latest.Priority.Status)
+  dplyr::select(contains("eBird.English.Name.20"), SoIB.Latest.Priority.Status) %>%
+  unique()
 
 main <- main %>% 
   # SoIB past statuses not available for habs/states
@@ -552,7 +553,6 @@ if (interannual_update == TRUE){
 
 # saving main sheet after classification
 write.csv(main, file = main_path, row.names = FALSE)
-
 
 # summaries -------------------------------------------------------------------
 
