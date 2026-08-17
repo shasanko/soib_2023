@@ -21,13 +21,13 @@ colnames <- c("timegroups", "COMMON.NAME", "lci", "mean", "rci",
 # #new <- read.csv("01_analyses_full/results/new_method_results.csv")[,colnames]
 # new <- read.csv("01_analyses_full/results/new_method_results (old and new).csv")[,colnames]
 
-old <- read.csv("01_analyses_full/results/new_method_results (old and new).csv")[,colnames]
-#new <- read.csv("01_analyses_full/results/new_method_results.csv")[,colnames]
-new <- read.csv("01_analyses_full/results/new_method_with_centroids.csv")[,colnames]
-new <- new[complete.cases(new),]
-#write_path <- "01_analyses_full/results/figs/no_subsamp_vs_2025_test/species_trends_batch_"
-
-write_path <- "01_analyses_full/results/figs/no_subsamp_corr_without_vs_with_centroid/species_trends_batch_"
+# old <- read.csv("01_analyses_full/results/new_method_results (old and new).csv")[,colnames]
+# #new <- read.csv("01_analyses_full/results/new_method_results.csv")[,colnames]
+# new <- read.csv("01_analyses_full/results/new_method_with_centroids.csv")[,colnames]
+# new <- new[complete.cases(new),]
+# #write_path <- "01_analyses_full/results/figs/no_subsamp_vs_2025_test/species_trends_batch_"
+# 
+# write_path <- "01_analyses_full/results/figs/no_subsamp_corr_without_vs_with_centroid/species_trends_batch_"
 
 
 # new <- new %>% filter(COMMON.NAME %in% c(unique(old$COMMON.NAME)))
@@ -39,6 +39,10 @@ write_path <- "01_analyses_full/results/figs/no_subsamp_corr_without_vs_with_cen
 # old <- read.csv("new_method_results_weights_bldr.csv")[,colnames]
 # new <- read.csv("new_method_results_expanded_bldr.csv")[,colnames]
 
+old <- read.csv("01_analyses_full/results/new_method_results (old and new).csv")[,colnames]
+new <- read.csv("01_analyses_full/results/trends_wetland_grids_no_centroids.csv")[,colnames]
+write_path <- "01_analyses_full/results/figs/wetland_grids/species_trends_batch_"
+
 
 names(old) <- colnames
 names(new) <- colnames
@@ -46,11 +50,16 @@ names(new) <- colnames
 length(unique(old$COMMON.NAME))
 length(unique(new$COMMON.NAME))
 
-old_legend <- "2025-update"
-new_legend <- "Weights - corrected"
+old <- old %>% filter(COMMON.NAME %in% unique(new$COMMON.NAME))
 
-old_legend <- "New method - pre centroid"
-new_legend <- "New method - post centroid"
+# old_legend <- "2025-update"
+# new_legend <- "Weights - corrected"
+# 
+# old_legend <- "New method - pre centroid"
+# new_legend <- "New method - post centroid"
+
+old_legend <- "All grids"
+new_legend <- "Wetland grids"
 
 # -----------------------------
 # 2. Combine datasets
