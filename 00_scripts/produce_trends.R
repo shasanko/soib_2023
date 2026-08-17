@@ -25,10 +25,18 @@ cat_folder <- cur_metadata$CAT.FOLDER
 
 load(cur_metadata$SPECLISTDATA.PATH)
 load(cur_metadata$DATA.PATH)
-wetland_filter = read.csv("00_data/wetland_classification.csv") %>%
-  dplyr::select(gridg0,grid_label) %>%
+
+## wetland grid selection file
+## details in "00_scripts/wetland_selection_check"
+
+wetland_filter = read.csv("00_data/grid_wetland_classification_intersection_all_states_seasonal_p20.csv")
+
+wetland_filter = wetland_filter %>%
+  arrange(desc(gridg0),desc(grid_label)) %>%
+  dplyr::distinct(gridg0,.keep_all = TRUE) %>%
+  dplyr::distinct(gridg0,grid_label) %>%
   mutate(gridg0 = as.character(gridg0))
-  
+
 wetland_species = read.csv("00_data/soib_mapping_2025.csv") %>%
   filter(Habitat.Specialization == "Wetland") %>%
   pull(eBird.English.Name.2025)
@@ -78,13 +86,15 @@ ltemp_full = databins %>% distinct(timegroups, year) %>%
 
 to_add = data.frame(timegroups = extra.years,
                     timegroupsf = as.character(extra.years))
-  
+
 ltemp_full = ltemp_full %>%
   bind_rows(to_add)
 
 # filtering according to selected species
 
 # tictoc::tic("across species")
+#totalspecieslist_ordered = totalspecieslist_ordered %>%
+#  filter(COMMON.NAME %in% speciesfortrends)
 
 for (species in totalspecieslist_ordered$COMMON.NAME)
 {
@@ -109,7 +119,7 @@ for (species in totalspecieslist_ordered$COMMON.NAME)
       filter(timegroups %in% soib_year_info("cat_years"))
     first_year = soib_year_info("cat_years")[1]
   }
-    
+  
   # if not ht, this will be a reduced timegroups
   tm = datas %>% distinct(timegroups)
   
@@ -128,7 +138,7 @@ for (species in totalspecieslist_ordered$COMMON.NAME)
       filter(grid_label == "wetland") %>%
       dplyr::select(-grid_label)
   }
-
+  
   data_freq = datas %>%
     filter(COMMON.NAME == species, ALL.SPECIES.REPORTED == 1) %>%
     group_by(timegroups,season,gridg0) %>%
@@ -180,7 +190,7 @@ for (species in totalspecieslist_ordered$COMMON.NAME)
   {
     ltemp = ltemp %>%
       mutate(timegroups = factor(timegroups, 
-                                  levels = soib_year_info("timegroup_lab", "FALSE"))) %>%
+                                 levels = soib_year_info("timegroup_lab", "FALSE"))) %>%
       arrange(season,timegroups)
   } else {
     ltemp = ltemp %>%
@@ -216,7 +226,7 @@ for (species in totalspecieslist_ordered$COMMON.NAME)
   
   # project trends
   f1_proj = trends_projections()
-
+  
   # time consuming step, five repeats of the 
   # model and bootMer for ltt sensitivity
   if(!is.na(ht)) {
@@ -243,7 +253,7 @@ for (species in totalspecieslist_ordered$COMMON.NAME)
            mean_std_comb = mean_std_recent,
            rci_std_comb = rci_std_recent) %>%
     bind_rows(f1_proj_tocomb)
-    
+  
   # calculating CIs for unstandardised trends
   f1_freqs = ltemp_pred_comb %>%
     mutate(COMMON.NAME = species) %>%
@@ -295,5 +305,5 @@ for (species in totalspecieslist_ordered$COMMON.NAME)
   }
   
   write.csv(cattrends_sens,cursens_path,row.names=F)
-
+  
 }

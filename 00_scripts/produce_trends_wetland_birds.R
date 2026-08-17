@@ -47,8 +47,12 @@ data = data %>%
                             season %in% c(9,10,11) ~ "Aut")) %>% 
   mutate(season = as.factor(season))
 
-wetland_filter = read.csv("00_data/wetland_classification.csv") %>%
-  dplyr::select(gridg0,grid_label) %>%
+wetland_filter = read.csv("00_data/grid_wetland_classification_intersection_all_states_seasonal_p20.csv")
+
+wetland_filter = wetland_filter %>%
+  arrange(desc(gridg0),desc(grid_label)) %>%
+  dplyr::distinct(gridg0,.keep_all = TRUE) %>%
+  dplyr::distinct(gridg0,grid_label) %>%
   mutate(gridg0 = as.character(gridg0))
 
 # wetland_species = read.csv("00_data/SoIB_mapping_2025.csv") %>%

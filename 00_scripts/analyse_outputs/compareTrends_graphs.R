@@ -14,9 +14,11 @@ library(purrr)
 # 1. Read and prepare the data
 # -----------------------------
 cols <- c(1, 2, 6, 7, 8, 9, 10, 11, 12, 13, 14)
+# colnames <- c("timegroups", "COMMON.NAME", "lci", "mean", "rci",
+#               "lci_std", "mean_std", "rci_std",
+#               "lci_std_recent", "mean_std_recent", "rci_std_recent")
 colnames <- c("timegroups", "COMMON.NAME", "lci", "mean", "rci",
-              "lci_std", "mean_std", "rci_std",
-              "lci_std_recent", "mean_std_recent", "rci_std_recent")
+              "lci_std", "mean_std", "rci_std")
 
 old <- read.csv("01_analyses_full/results/trends_Dec18_old_CI_no_filter_fix.csv")[,colnames]
 new <- read.csv("01_analyses_full/results/trends_Dec18_new_CI_no_filter_fix.csv")[,colnames]
@@ -46,9 +48,16 @@ old <- read.csv("01_analyses_full/results/trends_subsamp_test.csv")[,colnames]
 new <- read.csv("01_analyses_full/results/trends_n5000.csv")[,colnames]
 write_path <- "01_analyses_full/results/figs/subsamp_n1_vs_n5_test/species_trends_batch_"
 
+old <- read.csv("01_analyses_full/results/new_method_results (old and new).csv")[,colnames]
+new <- read.csv("01_analyses_full/results/trends_wetland_grids_no_centroids.csv")[,colnames]
+write_path <- "01_analyses_full/results/figs/wetland_grids/species_trends_batch_"
+
 names(old) <- colnames
 names(new) <- colnames
 
+old_legend <- "All grids"
+new_legend <- "Wetland grids"
+ 
 # -----------------------------
 # 2. Combine datasets
 # -----------------------------
@@ -315,10 +324,10 @@ for (i in seq_along(species_batches)) {
   
   # --- plotting
   p <- ggplot(plot_data, aes(x = timegroups)) +
-    geom_ribbon(aes(ymin = lci_std_new, ymax = rci_std_new, fill = "2025 Update - Subsamp 5"), alpha = 0.25) +
-    geom_ribbon(aes(ymin = lci_std_old, ymax = rci_std_old, fill = "2025 Update - Subsamp 1"), alpha = 0.4) +
-    geom_line(aes(y = mean_std_new, color = "2025 Update - Subsamp 5"), size = 1.1) +
-    geom_line(aes(y = mean_std_old, color = "2025 Update - Subsamp 1"), size = 1.1) +
+    geom_ribbon(aes(ymin = lci_std_new, ymax = rci_std_new, fill = new_legend), alpha = 0.25) +
+    geom_ribbon(aes(ymin = lci_std_old, ymax = rci_std_old, fill = old_legend), alpha = 0.4) +
+    geom_line(aes(y = mean_std_new, color = new_legend), size = 1.1) +
+    geom_line(aes(y = mean_std_old, color = old_legend), size = 1.1) +
     geom_hline(yintercept = 0, color = "black", linetype = "solid", linewidth = 0.8) +
     geom_text(aes(x = min(timegroups, na.rm = TRUE), y = 0, label = baseline_label),
               hjust = 0, vjust = -0.5, size = 3.2, color = "black") +
@@ -330,11 +339,11 @@ for (i in seq_along(species_batches)) {
     ) +
     scale_color_manual(
       name = "Trend Type",
-      values = c("2025 Update - Subsamp 1" = "#1f77b4", "2025 Update - Subsamp 5" = "#d62728")
+      values = c(old_legend = "#1f77b4", new_legend = "#d62728")
     ) +
     scale_fill_manual(
       name = "Trend Type (CI)",
-      values = c("2025 Update - Subsamp 1" = "#1f77b4", "2025 Update - Subsamp 5" = "#d62728")
+      values = c(old_legend = "#1f77b4", new_legend = "#d62728")
     ) +
     # --- Y-axis signed labels (+/-)
     scale_y_continuous(
