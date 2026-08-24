@@ -41,7 +41,11 @@ colnames <- c("timegroups", "COMMON.NAME", "lci", "mean", "rci",
 
 old <- read.csv("01_analyses_full/results/new_method_results (old and new).csv")[,colnames]
 new <- read.csv("01_analyses_full/results/trends_wetland_grids_no_centroids.csv")[,colnames]
-write_path <- "01_analyses_full/results/figs/wetland_grids/species_trends_batch_"
+write_path <- "01_analyses_full/results/figs/wetland_grids/ltt_wetland_grids_p50_yearly/species_trends_batch_"
+
+old <- read.csv("01_analyses_full/results/new_method_results (old and new).csv")[,colnames]
+new <- read.csv("01_analyses_full/results/trends_wetland_grids_no_centroids_p20.csv")[,colnames]
+write_path <- "01_analyses_full/results/figs/wetland_grids/ltt_wetland_grids_p20_seasonal/species_trends_batch_"
 
 
 names(old) <- colnames
@@ -59,7 +63,7 @@ old <- old %>% filter(COMMON.NAME %in% unique(new$COMMON.NAME))
 # new_legend <- "New method - post centroid"
 
 old_legend <- "All grids"
-new_legend <- "Wetland grids"
+new_legend <- "Wetland-p20 grids"
 
 # -----------------------------
 # 2. Combine datasets
