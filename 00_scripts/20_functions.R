@@ -135,21 +135,25 @@ join_mask_codes <- function(data) {
 # keystates object must exist in environment
 
 is_curspec_key4state <- function(data) {
-  
-  key_db <- keystates %>% 
-    distinct(ST_NM, eBird.English.Name.2024) %>% 
+
+  # reverted to India.Checklist.Common.Name (the join key used from 2023
+  # until a Dec 2025 change broke it -- key_state_species_full.csv has
+  # never had an eBird.English.Name column of any vintage, only
+  # ST_NM/India.Checklist.Common.Name/prop.range)
+  key_db <- keystates %>%
+    distinct(ST_NM, India.Checklist.Common.Name) %>%
     mutate(KEY = TRUE)
-  
-  data <- data %>% 
-    left_join(get_metadata() %>% distinct(MASK, MASK.TYPE)) %>% 
-    join_mask_codes() %>% 
-    left_join(key_db, 
-              by = c("MASK.LABEL" = "ST_NM", "eBird.English.Name.2024")) %>% 
-    complete(KEY, fill = list(KEY = FALSE)) %>% 
+
+  data <- data %>%
+    left_join(get_metadata() %>% distinct(MASK, MASK.TYPE)) %>%
+    join_mask_codes() %>%
+    left_join(key_db,
+              by = c("MASK.LABEL" = "ST_NM", "India.Checklist.Common.Name")) %>%
+    complete(KEY, fill = list(KEY = FALSE)) %>%
     mutate(KEY = case_when(MASK.TYPE == "state" ~ KEY,
-                           TRUE ~ NA)) %>% 
+                           TRUE ~ NA)) %>%
     dplyr::select(-c(MASK.TYPE, MASK.CODE, MASK.LABEL))
-  
+
 }
 
 
